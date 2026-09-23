@@ -4,7 +4,13 @@
 
 ## 下载
 
-到 [Releases](../../releases) 下载 `CrushMonitor-Setup-*.exe`（单文件，约 34 MB）。
+| 平台 | 文件 | 大小 |
+|---|---|---|
+| Windows | [Releases](../../releases) 里的 `CrushMonitor-Setup-*.exe`（单文件安装包） | 约 34 MB |
+| macOS | [Releases](../../releases) 里的 `CrushMonitor-macOS-*.tar.gz`（含 `.app`） | 约 78 MB |
+
+**macOS 首次打开**：把 `.app` 拖到「应用程序」，然后**右键 → 打开 → 再点「打开」**（未签名应用的常规提示）。如果仍被拦，在终端执行一次
+`xattr -dr com.apple.quarantine "/应用程序/好感度监测器.app"`。
 
 ## 这是什么
 
