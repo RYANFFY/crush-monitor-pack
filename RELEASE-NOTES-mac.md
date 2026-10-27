@@ -1,5 +1,7 @@
 macOS 版（第三方打包），基于上游 `FerryCorleone/crush-monitor` v1.1.1。
 
+> 本包不受 Windows 版卸载缺陷（[issue #1](https://github.com/RYANFFY/crush-monitor-pack/issues/1)）影响：macOS 版是绿色 `.app`，不写注册表、也不带卸载脚本。
+
 **源码与版权属于原作者：[FerryCorleone/crush-monitor](https://github.com/FerryCorleone/crush-monitor)。** 本仓库只发布打包产物。
 
 **怎么用**

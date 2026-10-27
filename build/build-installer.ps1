@@ -75,9 +75,37 @@ $ascii = New-Object System.Text.UTF8Encoding($false)
 $utf8bom = New-Object System.Text.UTF8Encoding($true)
 # 停止脚本（正常关窗即可退出，这里只是兜底）
 $stopCmd = @('@echo off','powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0stop.ps1"','echo.','pause') -join $crlf
-$uninstallCmd = @('@echo off','powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0uninstall.ps1"','echo.','pause') -join $crlf
+$uninstallCmd = @('@echo off','powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0uninstall.ps1"') -join $crlf
 $uninstallPs1 = @'
+param([switch]$NoPause)
+
+$ErrorActionPreference = 'Stop'
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$dir = [System.IO.Path]::GetFullPath($dir).TrimEnd('\')
+$manifest = Join-Path $dir '.crushmonitor-manifest.txt'
+
+function Fail([string]$message) {
+  Write-Host ''
+  Write-Host $message -ForegroundColor Red
+  Write-Host ''
+  Write-Host '没有删除任何文件。'
+  exit 1
+}
+
+# ── 安全闸门 ────────────────────────────────────────────────
+# 旧版卸载脚本直接 rmdir /s /q 自己所在目录，装到盘根时会清空整个盘（issue #1）。
+# 这里只按安装清单逐个删文件，任何一项校验不过就整体放弃，绝不做递归删除。
+if (-not (Test-Path -LiteralPath $dir -PathType Container)) { Fail "找不到安装目录：$dir" }
+if ($dir -match '^[A-Za-z]:$' -or $dir -match '^\\\\[^\\]+\\[^\\]+$') {
+  Fail "拒绝卸载：$dir 是盘符根目录（或共享根目录），删除它会波及整个盘。"
+}
+if ($dir.Length -lt 10) { Fail "拒绝卸载：$dir 路径过短，不像是正常的安装目录。" }
+if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
+  Fail "拒绝卸载：$dir 里没有本程序的安装清单（.crushmonitor-manifest.txt），无法确认哪些文件属于本程序。`n请手动删除程序文件；如果这是旧版本装的，建议先覆盖安装一次修复版再卸载。"
+}
+
+Write-Host "安装目录：$dir"
+Write-Host '正在停止程序…'
 # 先停应用窗口，再停它拉起来的后台服务（node 不解掉的话文件删不干净）
 Get-Process -Name '好感度监测器' -ErrorAction SilentlyContinue | ForEach-Object { try { $_.Kill() } catch {} }
 Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
@@ -88,11 +116,78 @@ for ($i = 0; $i -lt 20; $i++) {
   if (-not $busy) { break }
   Start-Sleep -Milliseconds 300
 }
+
 Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Crush 好感监控器.lnk') -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('Programs')) 'Crush 好感监控器.lnk') -Force -ErrorAction SilentlyContinue
 Remove-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\CrushMonitor' -Recurse -Force -ErrorAction SilentlyContinue
-Write-Host '快捷方式和卸载信息已清理，正在删除程序文件…'
-Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', ('ping -n 3 127.0.0.1 >nul & rmdir /s /q "' + $dir + '"') -WindowStyle Hidden
+
+# ── 按清单删除程序文件 ──────────────────────────────────────
+# 只删清单里登记过、并且规范化后确认位于安装目录内的文件；
+# 用户自己放进去的文件、.env、聊天记录都不在清单里，因此一律保留。
+$prefix = $dir + '\'
+$deferred = @('uninstall.ps1', '卸载.cmd')
+$removed = 0
+$failed = 0
+foreach ($line in [System.IO.File]::ReadAllLines($manifest)) {
+  if (-not $line.StartsWith('file=')) { continue }
+  $relative = $line.Substring(5).Trim()
+  if ([string]::IsNullOrWhiteSpace($relative)) { continue }
+  if ($relative -match '(^|[\\/])\.\.([\\/]|$)') { continue }
+  if ([System.IO.Path]::IsPathRooted($relative)) { continue }
+  $path = [System.IO.Path]::GetFullPath((Join-Path $dir $relative))
+  if (-not $path.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+  if ($deferred -contains [System.IO.Path]::GetFileName($path)) { continue }
+  if (Test-Path -LiteralPath $path -PathType Leaf) {
+    try {
+      Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+      $removed++
+    } catch {
+      $failed++
+    }
+  }
+}
+Write-Host "已删除程序文件 $removed 个。"
+if ($failed -gt 0) { Write-Host "有 $failed 个文件正在被占用，没能删掉；关掉程序后可以再运行一次卸载。" }
+
+# ── 只清理空目录，绝不递归删除 ──
+$folders = Get-ChildItem -LiteralPath $dir -Directory -Recurse -Force -ErrorAction SilentlyContinue |
+  Sort-Object { $_.FullName.Length } -Descending
+foreach ($folder in $folders) {
+  if (-not $folder.FullName.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+  try {
+    if (-not (Get-ChildItem -LiteralPath $folder.FullName -Force -ErrorAction Stop)) {
+      Remove-Item -LiteralPath $folder.FullName -Force -ErrorAction Stop
+    }
+  } catch {}
+}
+
+Remove-Item -LiteralPath $manifest -Force -ErrorAction SilentlyContinue
+
+$left = @(Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue |
+  Where-Object { $deferred -notcontains $_.Name })
+if ($left.Count -gt 0) {
+  Write-Host ''
+  Write-Host '以下内容无法确认属于本程序，已原样保留：'
+  foreach ($item in $left) { Write-Host ('  ' + $item.Name) }
+  Write-Host ''
+  Write-Host "确认不再需要的话，可以自己删掉这个文件夹：$dir"
+} else {
+  Write-Host '程序文件已全部删除。'
+}
+
+if (-not $NoPause) {
+  Write-Host ''
+  Read-Host '按回车关闭' | Out-Null
+}
+
+# ── 收尾 ────────────────────────────────────────────────────
+# PowerShell 已经把脚本读进内存，删掉自己不影响执行；
+# 目录只在完全为空时才移除（Directory.Delete 的非递归重载），不存在任何递归删除。
+Set-Location $env:TEMP -ErrorAction SilentlyContinue
+foreach ($name in @('uninstall.ps1', '卸载.cmd')) {
+  try { [System.IO.File]::Delete((Join-Path $dir $name)) } catch {}
+}
+try { [System.IO.Directory]::Delete($dir, $false) } catch {}
 '@ -join $crlf
 $startPs1 = @'
 $ErrorActionPreference = 'Stop'
@@ -157,6 +252,10 @@ $readme = @(
   '',
   '【怎么退出】',
   '直接关掉应用窗口就行，后台服务会一起退出。（万一没退干净，双击「停止.cmd」收尾。）',
+  '',
+  '【怎么卸载】',
+  '开始菜单右键「Crush 好感监控器」→ 卸载，或在「设置 → 应用」里卸载，也可以双击本文件夹里的「卸载.cmd」。',
+  '卸载只删除本程序安装时登记的文件，你自己放进去的东西、.env 和聊天记录都会保留。',
   '',
   '【注意】',
   '- 聊天记录存在浏览器本地，按地址端口分开保存；程序优先用 3178 端口，被占用时会自动换端口，',

@@ -1,3 +1,32 @@
+# 发布说明
+
+## ⚠️ v1.1.2：修复卸载可能误删整个目录的严重缺陷（请立即升级）
+
+**受影响版本：`v1.1.1-win.1` 及更早的 Windows 安装包。**
+
+旧版卸载程序把「安装目录」当成软件自己的目录整棵递归删除（`rmdir /s /q`）。安装到盘符根目录（如 `D:\`）时，删除范围会覆盖整个盘，表现为「盘被清空」；安装到已有其他资料的普通文件夹，也会误删该文件夹里的非程序文件。
+
+**已安装用户请注意：**
+
+- **不要**运行旧卸载程序，包括安装目录里的 `卸载.cmd` 和 Windows「设置 → 应用」里的卸载入口
+- **不要**为了升级而先卸载旧版，直接用 v1.1.2 安装包覆盖安装即可
+- 需要彻底清理旧版时，请手动逐个删除程序文件和快捷方式，不要对盘根做任何递归删除
+- 完整处置步骤见 [README](https://github.com/RYANFFY/crush-monitor-pack#readme) 顶部的安全公告，以及 [issue #1](https://github.com/RYANFFY/crush-monitor-pack/issues/1)
+
+### v1.1.2 改了什么
+
+- **安装位置校验**：规范化路径后拒绝盘符根目录、系统目录；始终安装到独立的 `CrushMonitor` 子目录
+- **目录归属校验**：目标文件夹已存在且不属于本程序时拒绝写入
+- **安装清单**：安装完成后写入 `.crushmonitor-manifest.txt`，记录本次安装的每个文件
+- **卸载改为清单驱动**：只删除清单里登记、且校验确认位于安装目录内的文件；不再使用 `rmdir /s /q`
+- **保留用户数据**：`.env`、聊天记录、用户自己放入的文件一律不删
+- **只清理空目录**：目录非空就保留；目录里没有安装清单时，卸载直接拒绝执行
+- **升级清理**：覆盖安装时只移除旧清单中、新版本不再提供的程序文件
+
+---
+
+## v1.1.1-win.1（已下架，请勿使用）
+
 Windows 安装包（第三方打包），基于上游 `FerryCorleone/crush-monitor` v1.1.1。
 
 **源码与版权属于原作者：[FerryCorleone/crush-monitor](https://github.com/FerryCorleone/crush-monitor)。** 本仓库只发布打包产物。
@@ -13,9 +42,9 @@ Windows 安装包（第三方打包），基于上游 `FerryCorleone/crush-monit
 
 **免责声明**：非官方打包，与原作者及 TypeSafe 无隶属关系；软件按「现状」提供、不提供担保，使用后果自负；分析结果由 AI 生成，仅供娱乐参考；聊天内容会发送到你所选的模型平台；安装包未签名，Windows 可能提示「未知发布者」。
 
-**截图 / 更多说明**：见仓库 [README](https://github.com/RYANFFY/crush-monitor-windows#readme)。
+**截图 / 更多说明**：见仓库 [README](https://github.com/RYANFFY/crush-monitor-pack#readme)。
 
-**SHA256**
+**SHA256**（`CrushMonitor-Setup-1.1.1-win.1.exe`，仅供已下载样本比对，该版本已下架）
 
 ```
 11D196C68E266D6D35AD03B06C2ECCB8796DA2574DF653EDFC24A74111E4E0CC
