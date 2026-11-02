@@ -1,0 +1,60 @@
+name: build-installer
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'build/installer-wizard.cs'
+      - '.github/workflows/build-installer.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 取载荷
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/RYANFFY/crush-monitor-pack/releases/download/v1.1.2-win.1/CrushMonitor-Portable-1.1.2-win.zip'
+          Invoke-WebRequest -Uri $url -OutFile payload.zip
+          $len = (Get-Item payload.zip).Length
+          "payload.zip: {0:N1} MB" -f ($len / 1MB)
+          if ($len -lt 10MB) { throw "载荷大小异常：$len" }
+
+      - name: 编译安装器
+        shell: pwsh
+        run: |
+          $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if (-not (Test-Path $csc)) { throw "找不到 csc：$csc" }
+          $out = 'CrushMonitor-Setup-1.1.2-win.1.exe'
+          & $csc /nologo /codepage:65001 /target:winexe /platform:anycpu "/out:$out" `
+            '/resource:payload.zip,payload.zip' `
+            /reference:System.dll /reference:System.Core.dll /reference:System.Windows.Forms.dll `
+            /reference:System.Drawing.dll /reference:System.IO.Compression.dll `
+            /reference:System.IO.Compression.FileSystem.dll `
+            'build\installer-wizard.cs'
+          if (-not (Test-Path $out)) { throw '编译失败，没有产出 exe' }
+          "exe: {0:N1} MB" -f ((Get-Item $out).Length / 1MB)
+
+      - name: 校验内嵌载荷
+        shell: pwsh
+        run: |
+          $exe = 'CrushMonitor-Setup-1.1.2-win.1.exe'
+          $bytes = [IO.File]::ReadAllBytes($exe)
+          # 用 Latin-1 做 1:1 字节映射，再按字节串查找，避免编码转换破坏匹配
+          $latin1 = [Text.Encoding]::GetEncoding(28591)
+          $hay = $latin1.GetString($bytes)
+          $needles = @('uninstall.ps1', 'node.exe', '.crushmonitor-manifest.txt', '好感度监测器.exe', '卸载.cmd')
+          foreach ($n in $needles) {
+            $pattern = $latin1.GetString([Text.Encoding]::UTF8.GetBytes($n))
+            if ($hay.IndexOf($pattern) -lt 0) { throw "载荷里缺少：$n" }
+            "找到 $n"
+          }
+          (Get-FileHash $exe -Algorithm SHA256).Hash
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CrushMonitor-Setup-1.1.2-win.1
+          path: CrushMonitor-Setup-1.1.2-win.1.exe
+          retention-days: 7
