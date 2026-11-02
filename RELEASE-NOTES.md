@@ -25,9 +25,10 @@
 
 ### v1.1.2 的下载形态
 
-本版**只提供免安装版**（`CrushMonitor-Portable-1.1.2-win.zip`）。安装器需要重新编译，构建依赖上游源码与 WebView2 SDK，本次没有产出新的 `Setup.exe`。
+本版提供两个包：
 
-免安装版里已经预置安装清单，`卸载.cmd` 只删除随包发布的文件，用户自己放进去的内容不动。
+- `CrushMonitor-Setup-1.1.2-win.1.exe` —— 安装版，由 GitHub Actions 编译（见 `.github/workflows/build-installer.yml`）
+- `CrushMonitor-Portable-1.1.2-win.zip` —— 免安装版，预置安装清单，`卸载.cmd` 只删随包发布的文件
 
 ---
 

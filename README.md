@@ -32,11 +32,11 @@
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
-| Windows | `CrushMonitor-Portable-1.1.2-win.zip`（免安装版，**当前推荐**） | 解压到独立文件夹即用，卸载已修复 |
-| Windows | `CrushMonitor-Setup-*.exe`（安装版） | **修复版尚未提供**；仅有的 `v1.1.1-win.1` 请勿使用 |
-| macOS | [Releases](../../releases) 里的 `CrushMonitor-macOS-*.tar.gz`（含 `.app`） | 约 78 MB |
+| Windows | `CrushMonitor-Setup-1.1.2-win.1.exe`（安装版，**推荐**） | 可选安装位置，自动建快捷方式 |
+| Windows | `CrushMonitor-Portable-1.1.2-win.zip`（免安装版） | 解压到独立文件夹即用 |
+| macOS | `CrushMonitor-macOS-*.tar.gz`（含 `.app`） | 约 78 MB |
 
-> Windows 安装版需要重新编译（依赖上游源码与 WebView2 SDK），暂以免安装版替代。解压时请选一个**独立的新文件夹**，不要放桌面、文档或已有资料的目录。
+> **请使用 `v1.1.2` 及以后的版本。** 安装时会自动装进你选的位置下的 `CrushMonitor` 子目录，并拒绝盘符根目录和已有其他文件的文件夹。
 
 **macOS 首次打开**：把 `.app` 拖到「应用程序」，然后**右键 → 打开 → 再点「打开」**（未签名应用的常规提示）。如果仍被拦，在终端执行一次
 `xattr -dr com.apple.quarantine "/应用程序/好感度监测器.app"`。
